@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://cg2u6cqq1ttfl"]
+[gd_scene load_steps=6 format=3 uid="uid://cg2u6cqq1ttfl"]
 
 [ext_resource type="Script" uid="uid://ct5y3egbjgjey" path="res://XMB.gd" id="1_4qg5u"]
+[ext_resource type="Shader" uid="uid://bej4ngjqxxgne" path="res://shader/loading_spinner.gdshader" id="2_4ywll"]
 
 [sub_resource type="Shader" id="Shader_sea"]
 code = "shader_type canvas_item;
@@ -143,7 +144,8 @@ void fragment() {
 
 	uv.y *= 0.5;
 	uv.x *= 0.45;
-	uv += bubble(uv, 12.0) + bubble(uv, 24.0); // Add bubbles
+	uv += bubble(uv, 12.0) + bubble(uv, 24.0);
+	// Add bubbles
 
 	vec3 rd = normalize(vec3(uv, -1.0));
 	vec3 color;
@@ -152,19 +154,17 @@ void fragment() {
 	float diffuse = dot(getNormal(result.hit_pos, eps), rd) * 0.5 + 0.5;
 	color = mix(sea_color_dark.rgb, sea_color_light.rgb, diffuse);
 	color += pow(diffuse, 12.0);
-
 	vec3 ref = normalize(refract(result.hit_pos - lightPos, getNormal(result.hit_pos, eps), 0.05));
 	float refraction = clamp(dot(ref, rd), 0.0, 1.0);
 	color += refraction_color.rgb * 0.6 * pow(refraction, 1.5);
 
 	vec3 col = vec3(0.0);
-	col = mix(color, sea_color_dark.rgb, pow(clamp(0.0, 1.0, result.dist), 0.2)); 
+	col = mix(color, sea_color_dark.rgb, pow(clamp(0.0, 1.0, result.dist), 0.2));
 	col += light_shaft_color.rgb * lightShafts(uv); 
 	col = (col * col + sin(col)) / vec3(1.8, 1.8, 1.9);
 
 	vec2 q = UV;
 	col *= 0.7 + 0.3 * pow(16.0 * q.x * q.y * (1.0 - q.x) * (1.0 - q.y), 0.2);
-
 	COLOR = vec4(col, 1.0);
 }
 "
@@ -177,6 +177,26 @@ shader_parameter/sea_color_dark = Color(0.04, 0.32, 0.55, 1)
 shader_parameter/sea_color_light = Color(0.06, 0.47, 0.6, 1)
 shader_parameter/refraction_color = Color(0.96, 0.98, 0.86, 1)
 shader_parameter/light_shaft_color = Color(0.88, 0.9, 0.78, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hffq8"]
+shader = ExtResource("2_4ywll")
+shader_parameter/dot_scale = 0.67800003150648
+shader_parameter/ring_radius = 0.36000001384012
+shader_parameter/num_points = 11
+shader_parameter/gap_ratio = 0.2410000114475
+shader_parameter/all_dots_same_size = false
+shader_parameter/dot_color_start = Color(0, 0.45434064, 0.9251645, 1)
+shader_parameter/dot_color_end = Color(0.29333335, 0.5063266, 1, 1)
+shader_parameter/enable_shadow = false
+shader_parameter/shadow_color = Color(0, 0, 0, 0.5)
+shader_parameter/shadow_offset = Vector2(0.05, -0.05)
+shader_parameter/rotation_speed = 1.0
+shader_parameter/reverse_rotation = false
+shader_parameter/icon_size = 0.4030000191425
+shader_parameter/enable_icon_rotation = false
+shader_parameter/reverse_icon_rotation = false
+shader_parameter/icon_rotation_speed = 1.0
+shader_parameter/show_icon = false
 
 [node name="XMB" type="Control"]
 layout_mode = 3
@@ -336,3 +356,47 @@ access = 2
 title = "Open a File"
 file_mode = 0
 access = 2
+
+[node name="LaunchAnimationOverlay" type="Control" parent="."]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="DimBackground" type="ColorRect" parent="LaunchAnimationOverlay"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 6382.0
+offset_bottom = 3654.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.588235)
+
+[node name="AnimatedIcon" type="TextureRect" parent="LaunchAnimationOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="AnimatedLabel" type="Label" parent="LaunchAnimationOverlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="LoadingSpinner" type="ColorRect" parent="LaunchAnimationOverlay"]
+visible = false
+material = SubResource("ShaderMaterial_hffq8")
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 439.0
+offset_top = 439.0
+offset_right = 639.0
+offset_bottom = 539.0
+grow_horizontal = 2
+grow_vertical = 0
+pivot_offset = Vector2(99.41, 49.4)

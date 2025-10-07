@@ -49,7 +49,14 @@ var current_emulator_selection = ""
 @onready var xmb_ui_elements = [$CameraOrigin, $SelectionInfo] 
 @onready var background_particles = $Background 
 @onready var background_container = $BackgroundContainer 
-@onready var background_image = $BackgroundContainer/BackgroundImage 
+@onready var background_image = $BackgroundContainer/BackgroundImage
+
+# --- NEW: References for the launch animation ---
+@onready var launch_overlay = $LaunchAnimationOverlay
+@onready var animated_icon = $LaunchAnimationOverlay/AnimatedIcon
+@onready var animated_label = $LaunchAnimationOverlay/AnimatedLabel
+@onready var loading_spinner = $LaunchAnimationOverlay/LoadingSpinner
+@onready var dimbackground = $LaunchAnimationOverlay/DimBackground
 
 var category_container: Node2D 
 var item_columns_container: Node2D 
@@ -263,52 +270,8 @@ func handle_accept_action():
 			print("Error: Could not launch game because path metadata is missing.")
 			return
 		
-		var game_path = selected_node.get_meta("game_path")
-		
-		# Use a match statement to handle different systems
-		match category_key:
-			"Switch":
-				# 1. Get all necessary paths
-				var python_executable = emulator_paths.get("python_executable_path", "python")
-				var emulator_exec_key = "Switch_EXEC"
-				if not emulator_paths.has(emulator_exec_key):
-					print("Error: Switch emulator executable path is not set in Settings.")
-					return
-				var emulator_exec_path = emulator_paths[emulator_exec_key]
-				var launcher_script_path = ProjectSettings.globalize_path("res://scripts/launch_game.py")
-
-				# 2. NEW: Build the entire command as a single string, with quotes around each path.
-				# This is crucial for handling paths with spaces.
-				var command_to_run = '"%s" "%s" "%s" "%s"' % [
-					python_executable, 
-					launcher_script_path, 
-					emulator_exec_path, 
-					game_path
-				]
-
-				# 3. NEW: Prepare arguments for cmd.exe.
-				# The "/c" flag tells cmd.exe to run the command and then exit.
-				var cmd_args = ["/c", command_to_run]
-				
-				print("--- Godot: Calling Python Launcher via CMD ---")
-				print("Executing: cmd.exe ", " ".join(cmd_args))
-
-				# 4. NEW: Execute via cmd.exe. This is a very reliable method on Windows.
-				# This call is blocking, but because the Python script is non-blocking,
-				# Godot should not freeze.
-				var output = [] # An empty array to hold any output from the command
-				var error = OS.execute("cmd.exe", cmd_args, output, true) # Using your proven method
-				if error != OK:
-					print("Error: Failed to start the command process. Exit code: ", error)
-					print("Output: ", "\n".join(output))
-
-
-			"Wii":
-				print("Wii launch logic is not yet implemented.")
-
-			_:
-				var game_name = selected_node.get_node("Label").text
-				print("Cannot launch '%s'. No launch logic for category '%s'." % [game_name, category_key])
+		# Instead of launching directly, we now call our animation function.
+		play_launch_animation_and_run_game(selected_node, category_key)
 
 func handle_settings_accept(): 
 	var current_menu_title = settings_history.back() 
@@ -644,9 +607,129 @@ func build_xmb_from_data():
 	category_container.position.x = initial_pos_x 
 	item_columns_container.position.x = initial_pos_x 
 
+func _execute_game_launch(category_key: String, game_path: String) -> int:
+	match category_key:
+		"Switch":
+			var python_executable = emulator_paths.get("python_executable_path", "python")
+			var emulator_exec_key = "Switch_EXEC"
+			if not emulator_paths.has(emulator_exec_key):
+				print("Error: Switch emulator executable path is not set in Settings.")
+				return FAILED # Return an error code
+			var emulator_exec_path = emulator_paths[emulator_exec_key]
+			var launcher_script_path = ProjectSettings.globalize_path("res://scripts/launch_game.py")
+
+			var command_to_run = '"%s" "%s" "%s" "%s"' % [
+				python_executable, 
+				launcher_script_path, 
+				emulator_exec_path, 
+				game_path
+			]
+
+			var cmd_args = ["/c", command_to_run]
+			print("--- Godot: Calling Python Launcher via CMD ---")
+			print("Executing: cmd.exe ", " ".join(cmd_args))
+
+			var output = []
+			#var error = OS.execute("cmd.exe", cmd_args, output, true)
+			#if error != OK:
+			#	print("Error: Failed to start the command process. Exit code: ", error)
+			#	print("Output: ", "\n".join(output))
+			
+			#return error # Return the result
+
+		"Wii":
+			print("Wii launch logic is not yet implemented.")
+			return FAILED
+
+		_:
+			print("Cannot launch. No launch logic for category '%s'." % [category_key])
+			return FAILED
+
+	return FAILED
+
+func play_launch_animation_and_run_game(node: Control, category_key: String):
+	# 1. Prevent player input
+	is_animating = true
+	loading_spinner.visible = true
+	dimbackground.visible = true
+
+	# 2. Get info from the selected item
+	var original_icon: TextureRect = node.get_node("Icon")
+	var original_label: Label = node.get_node("Label")
+	var game_path = node.get_meta("game_path")
+
+	# 3. Setup the animation overlay
+	animated_icon.texture = original_icon.texture
+	animated_label.text = original_label.text
+	animated_label.add_theme_font_size_override("font_size", 30)
+
+	# Get starting positions of the original item
+	var start_pos = original_icon.get_global_transform_with_canvas().get_origin()
+	var start_scale = original_icon.get_global_transform_with_canvas().get_scale()
+	
+	animated_icon.global_position = start_pos
+	animated_icon.scale = start_scale
+	animated_label.global_position = start_pos + Vector2(0, 120 * start_scale.y)
+
+	# --- Pre-Animation Setup ---
+	loading_spinner.modulate.a = 0.0
+	launch_overlay.visible = true
+	
+
+	# 4. Create a SINGLE tween to handle all animations
+	var tween = create_tween().set_parallel()
+	tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+
+	# --- Define Animation Targets ---
+	var screen_size = get_viewport_rect().size
+	var screen_center = screen_size / 2
+	
+	# Animate the icon
+	var icon_target_scale = Vector2.ONE * 3.0
+	tween.tween_property(animated_icon, "global_position", screen_center - (animated_icon.size * icon_target_scale / 2), 0.6)
+	tween.tween_property(animated_icon, "scale", icon_target_scale, 0.6)
+
+	# --- THE NEW FIX: Manually calculate the text's exact dimensions ---
+	var font = animated_label.get_theme_font("font")
+	var font_size = animated_label.get_theme_font_size("font_size")
+	var text_size = font.get_string_size(animated_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+
+	# Calculate the label's target position using the manually calculated width.
+	var label_target_pos = Vector2(
+		screen_center.x - (text_size.x / 2),
+		screen_center.y + 150
+	)
+	tween.tween_property(animated_label, "global_position", label_target_pos, 0.6)
+	
+	# Calculate spinner position based on the label's new target position and calculated height.
+	var spinner_target_pos = Vector2(
+		screen_center.x - (loading_spinner.size.x / 2),
+		label_target_pos.y + text_size.y + 50
+	)
+	tween.tween_property(loading_spinner, "position", spinner_target_pos, 0.6)
+	tween.tween_property(loading_spinner, "modulate:a", 1.0, 0.6)
+
+	# 5. Wait for animations and delay
+	await tween.finished
+	await get_tree().create_timer(4.0).timeout
+
+	# 6. Execute the game launch
+	var launch_result = _execute_game_launch(category_key, game_path)
+	
+	# 7. Minimize on success
+	if launch_result == OK:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
+
+	# 8. Clean up
+	launch_overlay.visible = false
+	is_animating = false
+	loading_spinner.visible = false
+	dimbackground.visible = false
+
 func create_menu_item(text: String, icon_path: String, is_category: bool) -> Control: 
 	var control = Control.new(); control.set_meta("is_category", is_category)
-	var icon = TextureRect.new() 
+	var icon = TextureRect.new()
+	icon.name = "Icon"
 	if ResourceLoader.exists(icon_path): icon.texture = load(icon_path) 
 	else: print("Warning: Icon not found: ", icon_path); icon.texture = load("res://icon.svg") 
 	icon.custom_minimum_size = ICON_SIZE; icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
