@@ -1,0 +1,17 @@
+{
+	"Switch": {
+		"icon_path": "res://icons/switch_icon.svg",
+		"items": [
+			"Mario Kart 8 [010075100E8EC000][v0].nsp",
+			"Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
+		]
+	},
+	"Wii": {
+		"icon_path": "res://icons/wii_icon.svg",
+		"items": [
+			"American Mensa Academy (USA).rvz",
+			"new.iso",
+			"test.iso"
+		]
+	}
+}

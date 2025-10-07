@@ -1,0 +1,13 @@
+2025-10-07 19:45:52,648 - INFO - --- Starting Python Scan Script ---
+2025-10-07 19:45:52,648 - INFO - Using directory from command-line argument: C:/Users/Andrej/AppData/Roaming/eden/config
+2025-10-07 19:45:52,648 - INFO - Reading from: C:/Users/Andrej/AppData/Roaming/eden/config\qt-config.ini
+2025-10-07 19:45:52,649 - INFO - Value for gamedir 1: SDMC
+2025-10-07 19:45:52,649 - INFO - Value for gamedir 2: UserNAND
+2025-10-07 19:45:52,650 - INFO - Value for gamedir 3: SysNAND
+2025-10-07 19:45:52,650 - INFO - Value for gamedir 4: E:/
+2025-10-07 19:45:52,650 - INFO -   -> No .nsp or .xci files found in 'E:/'.
+2025-10-07 19:45:52,651 - INFO - Value for gamedir 5: F:/Theo/roms/switch
+2025-10-07 19:45:52,651 - INFO -   -> Storing 2 matching items from 'F:/Theo/roms/switch'
+2025-10-07 19:45:52,651 - INFO - Saving found directory contents to 'C:/Users/Andrej/Documents/xmb-emulator/scripts/config/gamedir_contents_switch.json'...
+2025-10-07 19:45:52,652 - INFO - Save complete.
+2025-10-07 19:45:52,652 - INFO - --- Python Script Finished ---
