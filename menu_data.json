@@ -2,16 +2,31 @@
 	"Switch": {
 		"icon_path": "res://icons/switch_icon.svg",
 		"items": [
-			"Mario Kart 8 [010075100E8EC000][v0].nsp",
-			"Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
+			{
+				"name": "Mario Kart 8 [010075100E8EC000][v0].nsp",
+				"path": "F:/Theo/roms/switch/Mario Kart 8 [010075100E8EC000][v0].nsp"
+			},
+			{
+				"name": "Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci",
+				"path": "F:/Theo/roms/switch/Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
+			}
 		]
 	},
 	"Wii": {
 		"icon_path": "res://icons/wii_icon.svg",
 		"items": [
-			"American Mensa Academy (USA).rvz",
-			"new.iso",
-			"test.iso"
+			{
+				"name": "American Mensa Academy (USA).rvz",
+				"path": "C:/Users/Andrej/Downloads/wii-room/American Mensa Academy (USA).rvz"
+			},
+			{
+				"name": "new.iso",
+				"path": "C:/Users/Andrej/Downloads/wii-room/new.iso"
+			},
+			{
+				"name": "test.iso",
+				"path": "C:/Users/Andrej/Downloads/wii-room/test.iso"
+			}
 		]
 	}
 }

@@ -247,20 +247,68 @@ func handle_accept_action():
 	var category_key = categories[current_selection.x] 
 	if current_selection.y == 0: return 
 
-	var item_index = current_selection.y - 1 
-	var item_name = main_settings_items[item_index] if category_key == "Settings" else MENU_DATA[category_key]["items"][item_index] 
-
 	if category_key == "Settings":
-		# NEW: Check the item's TYPE, not just its name
+		var item_index = current_selection.y - 1 
+		var item_name = main_settings_items[item_index] 
 		var item_info = MENU_DATA["Settings"]["items"][item_name]
 		if item_info.get("type") == "action":
-			# This now handles ALL top-level actions
 			if item_name == "Exit":
 				get_tree().quit()
 		else: # If it's not an action, it must be a submenu
 			show_settings_panel(item_name)
 	else: 
-		print("Launch game: %s from category %s" % [item_name, category_key])
+		# --- GAME LAUNCH LOGIC ---
+		var selected_node = get_item_node(current_selection)
+		if not selected_node or not selected_node.has_meta("game_path"):
+			print("Error: Could not launch game because path metadata is missing.")
+			return
+		
+		var game_path = selected_node.get_meta("game_path")
+		
+		# Use a match statement to handle different systems
+		match category_key:
+			"Switch":
+				# 1. Get all necessary paths
+				var python_executable = emulator_paths.get("python_executable_path", "python")
+				var emulator_exec_key = "Switch_EXEC"
+				if not emulator_paths.has(emulator_exec_key):
+					print("Error: Switch emulator executable path is not set in Settings.")
+					return
+				var emulator_exec_path = emulator_paths[emulator_exec_key]
+				var launcher_script_path = ProjectSettings.globalize_path("res://scripts/launch_game.py")
+
+				# 2. NEW: Build the entire command as a single string, with quotes around each path.
+				# This is crucial for handling paths with spaces.
+				var command_to_run = '"%s" "%s" "%s" "%s"' % [
+					python_executable, 
+					launcher_script_path, 
+					emulator_exec_path, 
+					game_path
+				]
+
+				# 3. NEW: Prepare arguments for cmd.exe.
+				# The "/c" flag tells cmd.exe to run the command and then exit.
+				var cmd_args = ["/c", command_to_run]
+				
+				print("--- Godot: Calling Python Launcher via CMD ---")
+				print("Executing: cmd.exe ", " ".join(cmd_args))
+
+				# 4. NEW: Execute via cmd.exe. This is a very reliable method on Windows.
+				# This call is blocking, but because the Python script is non-blocking,
+				# Godot should not freeze.
+				var output = [] # An empty array to hold any output from the command
+				var error = OS.execute("cmd.exe", cmd_args, output, true) # Using your proven method
+				if error != OK:
+					print("Error: Failed to start the command process. Exit code: ", error)
+					print("Output: ", "\n".join(output))
+
+
+			"Wii":
+				print("Wii launch logic is not yet implemented.")
+
+			_:
+				var game_name = selected_node.get_node("Label").text
+				print("Cannot launch '%s'. No launch logic for category '%s'." % [game_name, category_key])
 
 func handle_settings_accept(): 
 	var current_menu_title = settings_history.back() 
@@ -559,18 +607,34 @@ func build_xmb_from_data():
 		item_columns_container.add_child(column_node) 
 		item_columns.push_back(column_node) 
 		
-		for i in range(items.size()): 
-			var item_name = items[i] 
-			var icon_path = "res://icon.svg" # Default fallback 
-			
-			if category_name == "Settings": 
-				var item_data = category_data["items"][item_name] 
-				if item_data.has("icon_path"): 
-					icon_path = item_data.icon_path 
+		for i in range(items.size()):
+			var item_entry = items[i]
+			var item_name = ""
+			var icon_path = "res://icon.svg" # Default fallback
+			var item_node: Control
 
-			var item_node = create_menu_item(item_name, icon_path, false) 
-			item_node.position = Vector2(0, (i + 1) * VERTICAL_SPACING) 
-			column_node.add_child(item_node) 
+			if category_name == "Settings":
+				# For settings, the entry is a string (the menu item's name)
+				item_name = item_entry
+				var item_data = category_data["items"][item_name]
+				if item_data.has("icon_path"):
+					icon_path = item_data.icon_path
+				item_node = create_menu_item(item_name, icon_path, false)
+
+			else:
+				# For games, the entry should be a dictionary { "name": ..., "path": ... }
+				if typeof(item_entry) == TYPE_DICTIONARY:
+					item_name = item_entry.get("name", "Unknown Game")
+					item_node = create_menu_item(item_name, icon_path, false)
+					# Store the full path as metadata in the node for later use (e.g., launching)
+					item_node.set_meta("game_path", item_entry.get("path", ""))
+				else:
+					# Fallback for any old string-based data
+					item_name = str(item_entry)
+					item_node = create_menu_item(item_name, icon_path, false)
+
+			item_node.position = Vector2(0, (i + 1) * VERTICAL_SPACING)
+			column_node.add_child(item_node)
 			
 	update_item_visibility() 
 	current_selection = Vector2i.ZERO
@@ -587,7 +651,7 @@ func create_menu_item(text: String, icon_path: String, is_category: bool) -> Con
 	else: print("Warning: Icon not found: ", icon_path); icon.texture = load("res://icon.svg") 
 	icon.custom_minimum_size = ICON_SIZE; icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; icon.position = -ICON_SIZE / 2 
-	var label = Label.new(); label.text = text; label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var label = Label.new(); label.name = "Label"; label.text = text; label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER; label.position = Vector2(-200,50) 
 	label.custom_minimum_size = Vector2(400, 50); control.add_child(icon); control.add_child(label) 
 	if is_category: 
@@ -686,22 +750,26 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		
 	# --- NEW FIX: Handle the dictionary structure from Python ---
 	var json_data = json.data
-	var game_names = [] # Create an empty array to hold all games
+	var game_items = [] # This will now store dictionaries, not just names
 
 	if typeof(json_data) == TYPE_DICTIONARY:
-		# If the JSON is a dictionary, iterate through all its values (the lists of games)
-		for game_list in json_data.values():
-			if typeof(game_list) == TYPE_ARRAY:
-				game_names.append_array(game_list) # Add the games from each list to our main list
-	elif typeof(json_data) == TYPE_ARRAY:
-		# If the JSON is already a simple array, just use it
-		game_names = json_data
+		# Iterate through the keys (the base paths) of the dictionary
+		for base_path in json_data.keys():
+			var file_list = json_data[base_path]
+			if typeof(file_list) == TYPE_ARRAY:
+				# For each filename, create a dictionary with the name and full path
+				for filename in file_list:
+					var full_path = base_path.path_join(filename)
+					game_items.append({
+						"name": filename,
+						"path": full_path
+					})
 	else:
-		print("Error: The JSON from the Python script is not a valid Array or Dictionary.")
+		print("Error: The JSON from the Python script is not a dictionary as expected.")
 		return
-	# --- END NEW FIX ---
-	
-	print("Found %d games for %s from script output." % [game_names.size(), emulator_name])
+	# --- END NEW LOGIC ---
+
+	print("Found %d games for %s from script output." % [game_items.size(), emulator_name])
 	
 	var game_data = {}
 	if FileAccess.file_exists(MENU_DATA_PATH):
@@ -720,7 +788,7 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		
 	game_data[emulator_name] = {
 		"icon_path": icon,
-		"items": game_names
+		"items": game_items
 	}
 	save_game_data_to_json(game_data)
 	
