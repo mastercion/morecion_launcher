@@ -35,6 +35,7 @@ var current_selection = Vector2i.ZERO
 var current_settings_selection_index = 0 
 var emulator_paths = {}
 var current_emulator_selection = ""
+var last_launched_game_coords = Vector2i(-1, -1)
 
 # Node References 
 @onready var camera_origin = $CameraOrigin 
@@ -57,6 +58,7 @@ var current_emulator_selection = ""
 @onready var animated_label = $LaunchAnimationOverlay/AnimatedLabel
 @onready var loading_spinner = $LaunchAnimationOverlay/LoadingSpinner
 @onready var dimbackground = $LaunchAnimationOverlay/DimBackground
+@onready var process_check_timer = $ProcessCheckTimer
 
 var category_container: Node2D 
 var item_columns_container: Node2D 
@@ -96,6 +98,11 @@ func _ready():
 	
 	# Add this line
 	$PythonPathDialog.file_selected.connect(_on_python_path_selected)
+	
+	# --- NEW: Setup and start the process checker ---
+	process_check_timer.wait_time = 3.0 # Check every 3 seconds
+	process_check_timer.timeout.connect(_on_process_check_timeout)
+	process_check_timer.start()
 
 func _unhandled_input(event): 
 	var dialogs_visible = background_file_dialog.visible or emulator_dir_dialog.visible or emulator_dir_dialog_exec.visible or $PythonPathDialog.visible
@@ -104,6 +111,50 @@ func _unhandled_input(event):
 	match current_state: 
 		XMB: handle_xmb_input(event) 
 		SETTINGS: handle_settings_input(event) 
+
+func _on_process_check_timeout():
+	# If no game has been launched, there's nothing to check.
+	if last_launched_game_coords == Vector2i(-1, -1):
+		return
+
+	# 1. Get the category and executable path for the *specific game* that was launched.
+	var category_index = last_launched_game_coords.x
+	var category_name = categories[category_index]
+	var exec_key = category_name + "_EXEC"
+
+	# 2. If we don't have an emulator executable path for this category, we can't check it.
+	if not emulator_paths.has(exec_key):
+		return
+
+	# 3. Get the emulator's .exe name (e.g., "yuzu.exe").
+	var full_path = emulator_paths[exec_key]
+	var exe_name = full_path.get_file()
+
+	# 4. Check if that specific emulator process is still running.
+	var is_running = is_process_running(exe_name)
+
+	# 5. If the process is NOT running anymore, it means the user closed the game.
+	if not is_running:
+		# Reset the coordinates to their default "no game launched" state.
+		last_launched_game_coords = Vector2i(-1, -1)
+		# Call the existing update function, which will now hide the icon.
+		update_play_icons()
+
+
+# Helper function that checks if a process is running on Windows.
+func is_process_running(exe_name: String) -> bool:
+	var output = []
+	var command = "tasklist"
+	var args = ["/NH", "/FI", "IMAGENAME eq %s" % exe_name]
+	
+	# OS.execute runs the command and captures the output
+	var exit_code = OS.execute(command, args, output, true)
+	
+	if exit_code == OK:
+		# If the output contains the exe name, the process was found.
+		return not output.is_empty() and output[0].contains(exe_name)
+	
+	return false
 
 # --- 3. DATA LOADING & PERSISTENCE ---
 
@@ -121,7 +172,7 @@ func load_menu_data():
 			
 			"Menu Speed": { "type": "list", "options": ["Slow", "Standard", "Fast"] },
 			"Menu Color": { "type": "list", "options": ["Blue", "Green", "Yellow", "Red"] },
-			#"Background": { "type": "submenu", "options": ["Select Background", "Image Fit", "Manual Zoom"] },
+			"Background": { "type": "submenu", "options": ["Select Background", "Image Fit", "Manual Zoom"] },
 			
 			"Select Background": { "type": "grid" },
 			"Image Fit": { "type": "list", "options": ["Stretch", "Zoom", "Center"] },
@@ -203,7 +254,23 @@ func handle_settings_input(event):
 	elif event.is_action_pressed("ui_left"): move_settings_selection(Vector2i(-1, 0)) 
 	elif event.is_action_pressed("ui_accept"): handle_settings_accept() 
 
-func move_selection(direction: Vector2i): 
+func update_play_icons():
+	# Loop through all category columns
+	for x in range(item_columns.size()):
+		var column = item_columns[x]
+		# Loop through all game items in that column
+		for y in range(column.get_child_count()):
+			var item_node = column.get_child(y)
+			if item_node.has_node("PlayIconOverlay"):
+				var play_icon = item_node.get_node("PlayIconOverlay")
+				
+				# The coordinates for an item are (columnIndex, itemIndex + 1)
+				var item_coords = Vector2i(x, y + 1)
+				
+				# Show the icon only if its coordinates match the one we launched
+				play_icon.visible = (item_coords == last_launched_game_coords)
+
+func move_selection(direction: Vector2i):
 	var new_selection = current_selection + direction 
 	new_selection.x = clamp(new_selection.x, 0, categories.size() - 1) 
 	if direction.x != 0: new_selection.y = 0 
@@ -630,12 +697,12 @@ func _execute_game_launch(category_key: String, game_path: String) -> int:
 			print("Executing: cmd.exe ", " ".join(cmd_args))
 
 			var output = []
-			#var error = OS.execute("cmd.exe", cmd_args, output, true)
-			#if error != OK:
-			#	print("Error: Failed to start the command process. Exit code: ", error)
-			#	print("Output: ", "\n".join(output))
+			var error = OS.execute("cmd.exe", cmd_args, output, true)
+			if error != OK:
+				print("Error: Failed to start the command process. Exit code: ", error)
+				print("Output: ", "\n".join(output))
 			
-			#return error # Return the result
+			return error # Return the result
 
 		"Wii":
 			print("Wii launch logic is not yet implemented.")
@@ -712,6 +779,12 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	# 5. Wait for animations and delay
 	await tween.finished
 	await get_tree().create_timer(4.0).timeout
+	
+	# --- NEW LOGIC ---
+	# Remember which game we are about to launch.
+	last_launched_game_coords = current_selection
+	# Update the UI to show the play icon.
+	update_play_icons()
 
 	# 6. Execute the game launch
 	var launch_result = _execute_game_launch(category_key, game_path)
@@ -737,6 +810,19 @@ func create_menu_item(text: String, icon_path: String, is_category: bool) -> Con
 	var label = Label.new(); label.name = "Label"; label.text = text; label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER; label.position = Vector2(-200,50) 
 	label.custom_minimum_size = Vector2(400, 50); control.add_child(icon); control.add_child(label) 
+	if not is_category:
+		var play_icon = TextureRect.new()
+		play_icon.name = "PlayIconOverlay"
+		play_icon.texture = load("res://src/icons/settings/icon_playing.svg") # Your icon path
+		play_icon.custom_minimum_size = Vector2(48, 48) # Adjust size as needed
+		play_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		play_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		
+		# Position it at the bottom-right of the main icon
+		play_icon.position = (ICON_SIZE / 2) - play_icon.custom_minimum_size - Vector2(5, 5)
+		
+		play_icon.visible = false # Hide it by default
+		control.add_child(play_icon)
 	if is_category: 
 		var theme_override = Theme.new(); theme_override.set_font_size("font_size", "Label", 30)
 		label.theme = theme_override 
