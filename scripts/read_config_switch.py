@@ -4,10 +4,17 @@ import json
 import logging
 import re
 import requests
+from dotenv import load_dotenv
 
-# --- ADDED: API and File Path Configuration ---
-STEAMGRIDDB_API_KEY = ""
+load_dotenv()
+api_key = os.getenv("STEAMGRIDDB_API_KEY")
 STEAMGRIDDB_API_URL = "https://www.steamgriddb.com/api/v2"
+
+if api_key:
+    print("API key loaded successfully!")
+    # Check for API Key, for easier debugging later
+else:
+    print("Error: Could not load API key. Make sure it's set in your .env file.")
 
 # Get the directory where the script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
