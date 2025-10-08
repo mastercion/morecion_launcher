@@ -662,16 +662,19 @@ func build_xmb_from_data():
 				if item_data.has("icon_path"):
 					icon_path = item_data.icon_path
 				item_node = create_menu_item(item_name, icon_path, false)
-
 			else:
-				# For games, the entry should be a dictionary { "name": ..., "path": ... }
+				# For games, the entry is a dictionary { "name": ..., "path": ..., "icon_path": ... }
 				if typeof(item_entry) == TYPE_DICTIONARY:
 					item_name = item_entry.get("name", "Unknown Game")
+					# --- MODIFIED LINE ---
+					# Use the icon_path from the dictionary, with a fallback
+					icon_path = item_entry.get("icon_path", "res://icon.svg") 
+					
 					item_node = create_menu_item(item_name, icon_path, false)
-					# Store the full path as metadata in the node for later use (e.g., launching)
+					# Store the full path as metadata in the node for later use
 					item_node.set_meta("game_path", item_entry.get("path", ""))
 				else:
-					# Fallback for any old string-based data
+					# Fallback for old string-based data (shouldn't happen with new script)
 					item_name = str(item_entry)
 					item_node = create_menu_item(item_name, icon_path, false)
 
@@ -749,6 +752,8 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	is_animating = true
 	loading_spinner.visible = true
 	dimbackground.visible = true
+	
+	node.scale = Vector2.ONE
 
 	# --- RESET STATE AND GO WILD ---
 	background_shader_rect.modulate = Color.WHITE # <-- ADD THIS LINE
@@ -839,33 +844,56 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	dimbackground.visible = false
 
 func create_menu_item(text: String, icon_path: String, is_category: bool) -> Control: 
-	var control = Control.new(); control.set_meta("is_category", is_category)
+	var control = Control.new()
 	var icon = TextureRect.new()
 	icon.name = "Icon"
-	if ResourceLoader.exists(icon_path): icon.texture = load(icon_path) 
-	else: print("Warning: Icon not found: ", icon_path); icon.texture = load("res://icon.svg") 
-	icon.custom_minimum_size = ICON_SIZE; icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED; icon.position = -ICON_SIZE / 2 
+	
+	# --- START: NEW IMAGE RESIZING LOGIC ---
+	
+	# 1. Load the file into an Image object, which contains the raw pixel data.
+	var img = Image.new()
+	var err = img.load(icon_path) # Use img.load() as it's safer
+	
+	# 2. Check if the image loaded successfully. If not, load the default icon.
+	if err != OK:
+		print("Warning: Icon not found or could not be loaded: ", icon_path)
+		img.load("res://icon.svg") # Load the default fallback image
+	
+	# 3. Resize the image data in memory to our target size.
+	#    This is the crucial step that scales the image down.
+	img.resize(100, 100) # Force all icons to be 100x100 pixels
+	
+	# 4. Create an ImageTexture from our newly resized Image data.
+	icon.texture = ImageTexture.create_from_image(img)
+	
+	# --- END: NEW IMAGE RESIZING LOGIC ---
+	
+	icon.custom_minimum_size = ICON_SIZE
+	icon.size = ICON_SIZE
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.position = -ICON_SIZE / 2
+	
 	var label = Label.new(); label.name = "Label"; label.text = text; label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER; label.position = Vector2(-200,50) 
 	label.custom_minimum_size = Vector2(400, 50); control.add_child(icon); control.add_child(label) 
+	
 	if not is_category:
 		var play_icon = TextureRect.new()
 		play_icon.name = "PlayIconOverlay"
-		play_icon.texture = load("res://src/icons/settings/icon_playing.svg") # Your icon path
-		play_icon.custom_minimum_size = Vector2(48, 48) # Adjust size as needed
+		play_icon.texture = load("res://src/icons/settings/icon_playing.svg")
+		play_icon.custom_minimum_size = Vector2(48, 48)
 		play_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		play_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		
-		# Position it at the bottom-right of the main icon
 		play_icon.position = (ICON_SIZE / 2) - play_icon.custom_minimum_size - Vector2(5, 5)
-		
-		play_icon.visible = false # Hide it by default
+		play_icon.visible = false
 		control.add_child(play_icon)
+	
 	if is_category: 
 		var theme_override = Theme.new(); theme_override.set_font_size("font_size", "Label", 30)
 		label.theme = theme_override 
-	return control 
+		
+	return control
 
 # --- 9. ANIMATION & HELPERS ---
 
@@ -965,19 +993,52 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		for base_path in json_data.keys():
 			var file_list = json_data[base_path]
 			if typeof(file_list) == TYPE_ARRAY:
-				# For each filename, create a dictionary with the name and full path
-				for filename in file_list:
-					var full_path = base_path.path_join(filename)
-					game_items.append({
-						"name": filename,
-						"path": full_path
-					})
+				# For each game object (which is a dictionary) in the list...
+				for game_object in file_list:
+					# Check if it's actually a dictionary with the keys we need
+					if typeof(game_object) == TYPE_DICTIONARY and game_object.has("filename"):
+						var filename = game_object["filename"]
+						var icon_path = game_object.get("icon_path", "res://icon.svg") # Use a default if no icon
+						var full_path = base_path.path_join(filename)
+						
+						game_items.append({
+							"name": filename,
+							"path": full_path,
+							"icon_path": icon_path # <-- Store the icon path
+						})
 	else:
 		print("Error: The JSON from the Python script is not a dictionary as expected.")
 		return
 	# --- END NEW LOGIC ---
 
 	print("Found %d games for %s from script output." % [game_items.size(), emulator_name])
+	
+	# --- START: NEW AND CORRECTED LOGIC ---
+	
+	# 1. Determine the correct icon path first
+	var category_icon_path = "res://icon.svg" # Default fallback
+	if emulator_name == "Switch":
+		category_icon_path = "res://src/icons/platform/icon_switch.svg"
+	elif emulator_name == "Wii":
+		category_icon_path = "res://src/icons/platform/icon_wii.svg"
+	
+	# 2. Update the in-memory MENU_DATA directly for the current session
+	if not MENU_DATA.has(emulator_name):
+		MENU_DATA[emulator_name] = {}
+		
+	MENU_DATA[emulator_name]["icon_path"] = category_icon_path
+	MENU_DATA[emulator_name]["items"] = game_items
+	
+	# 3. Create a clean version of the data to save to the file
+	#    (This removes the "Settings" category from the JSON file)
+	var data_to_save = MENU_DATA.duplicate()
+	data_to_save.erase("Settings")
+	save_game_data_to_json(data_to_save)
+	
+	# 4. Now, rebuild the menu using the updated in-memory data
+	rebuild_xmb_menu()
+	
+	# --- END: NEW AND CORRECTED LOGIC ---
 	
 	var game_data = {}
 	if FileAccess.file_exists(MENU_DATA_PATH):
@@ -990,9 +1051,9 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 	
 	var icon = "res://icon.svg"
 	if emulator_name == "Switch":
-		icon = "res://icons/switch_icon.svg"
+		icon = "res://src/icons/platform/icon_switch.svg"
 	elif emulator_name == "Wii":
-		icon = "res://icons/wii_icon.svg"
+		icon = "res://src/icons/platform/icon_wii.svg"
 		
 	game_data[emulator_name] = {
 		"icon_path": icon,

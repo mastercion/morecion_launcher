@@ -3,10 +3,12 @@
 		"icon_path": "res://src/icons/platform/icon_switch.svg",
 		"items": [
 			{
+				"icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Mario Kart 8 [010075100E8EC000][v0].png",
 				"name": "Mario Kart 8 [010075100E8EC000][v0].nsp",
 				"path": "F:/Theo/roms/switch/Mario Kart 8 [010075100E8EC000][v0].nsp"
 			},
 			{
+				"icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).png",
 				"name": "Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci",
 				"path": "F:/Theo/roms/switch/Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
 			}

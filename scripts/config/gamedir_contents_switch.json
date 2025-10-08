@@ -1,6 +1,12 @@
 {
     "F:/Theo/roms/switch": [
-        "Mario Kart 8 [010075100E8EC000][v0].nsp",
-        "Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
+        {
+            "filename": "Mario Kart 8 [010075100E8EC000][v0].nsp",
+            "icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Mario Kart 8 [010075100E8EC000][v0].png"
+        },
+        {
+            "filename": "Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci",
+            "icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).png"
+        }
     ]
 }
