@@ -1,6 +1,6 @@
 {
 	"Switch": {
-		"icon_path": "res://icons/switch_icon.svg",
+		"icon_path": "res://src/icons/platform/icon_switch.svg",
 		"items": [
 			{
 				"name": "Mario Kart 8 [010075100E8EC000][v0].nsp",
@@ -13,7 +13,7 @@
 		]
 	},
 	"Wii": {
-		"icon_path": "res://icons/wii_icon.svg",
+		"icon_path": "res://src/icons/platform/icon_wii.svg",
 		"items": [
 			{
 				"name": "American Mensa Academy (USA).rvz",

@@ -184,8 +184,8 @@ func load_menu_data():
 	if not FileAccess.file_exists(MENU_DATA_PATH):
 		print("menu_data.json not found, creating a default one.")
 		game_data = {
-			"Switch": { "icon_path": "res://icons/switch_icon.svg", "items": [] },
-			"Wii": { "icon_path": "res://icons/wii_icon.svg", "items": [] }
+			"Switch": { "icon_path": "res://src/icons/platform/icon_switch.svg", "items": [] },
+			"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] }
 		}
 		save_game_data_to_json(game_data)
 	else:
@@ -196,8 +196,8 @@ func load_menu_data():
 		if content.is_empty():
 			print("Warning: menu_data.json is empty. Re-initializing.")
 			game_data = {
-				"Switch": { "icon_path": "res://icons/switch_icon.svg", "items": [] },
-				"Wii": { "icon_path": "res://icons/wii_icon.svg", "items": [] }
+				"Switch": { "icon_path": "res://src/icons/platform/icon_switch.svg", "items": [] },
+				"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] }
 			}
 		else:
 			var json = JSON.new()
