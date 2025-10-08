@@ -36,6 +36,8 @@ var current_settings_selection_index = 0
 var emulator_paths = {}
 var current_emulator_selection = ""
 var last_launched_game_coords = Vector2i(-1, -1)
+var default_shader_time_speed: float = 1.0
+var needs_background_reset = false
 
 # Node References 
 @onready var camera_origin = $CameraOrigin 
@@ -51,6 +53,8 @@ var last_launched_game_coords = Vector2i(-1, -1)
 @onready var background_particles = $Background 
 @onready var background_container = $BackgroundContainer 
 @onready var background_image = $BackgroundContainer/BackgroundImage
+@onready var navigation_sound = $NavigationSound
+@onready var background_shader_rect = $ColorRect
 
 # --- NEW: References for the launch animation ---
 @onready var launch_overlay = $LaunchAnimationOverlay
@@ -73,6 +77,9 @@ func _ready():
 	# Load persistent data first
 	load_menu_data() 
 	load_emulator_paths()
+
+	# Default Shader Behaivor
+	default_shader_time_speed = background_shader_rect.material.get_shader_parameter("time_speed")
 	
 	settings_panel.visible = false 
 	background_image.visible = false 
@@ -279,7 +286,8 @@ func move_selection(direction: Vector2i):
 	var item_count = main_settings_items.size() if category_key == "Settings" else MENU_DATA[category_key]["items"].size() 
 	new_selection.y = clamp(new_selection.y, 0, item_count) 
 	
-	if new_selection != current_selection: 
+	if new_selection != current_selection:
+		navigation_sound.play()
 		current_selection = new_selection 
 		animate_to_selection() 
 		update_item_visibility() 
@@ -294,14 +302,18 @@ func move_settings_selection(direction: Vector2i):
 	var items = container.get_children() 
 	if items.is_empty(): return 
 	
+	var old_index = current_settings_selection_index
 	var new_index = current_settings_selection_index 
 	if menu_info.type == "grid": 
 		var columns = container.columns 
 		new_index += direction.y * columns + direction.x 
 	else: 
 		new_index += direction.y 
+	current_settings_selection_index = clamp(new_index, 0, items.size() - 1)
+	
+	if old_index != current_settings_selection_index:
+		navigation_sound.play()
 
-	current_settings_selection_index = clamp(new_index, 0, items.size() - 1) 
 	update_settings_highlight() 
 
 # --- 5. DRAG AND DROP --- 
@@ -714,11 +726,33 @@ func _execute_game_launch(category_key: String, game_path: String) -> int:
 
 	return FAILED
 
+func _notification(what):
+	# This function is called when the game window's state changes.
+	# We check if the window just regained focus.
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+		# If it did, and our flag is set, it's time to run the reset animation.
+		if needs_background_reset:
+			# Set the flag to false immediately so this animation doesn't run again.
+			needs_background_reset = false
+			
+			# Create a new tween to animate the background back to its standard state.
+			var reset_tween = create_tween().set_parallel()
+			reset_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			
+			# Animate the speed from 0 back to the default.
+			reset_tween.tween_property(background_shader_rect.material, "shader_parameter/time_speed", default_shader_time_speed, 1.5)
+			# Animate the color from dim gray back to white.
+			reset_tween.tween_property(background_shader_rect, "modulate", Color.WHITE, 1.5)
+
 func play_launch_animation_and_run_game(node: Control, category_key: String):
-	# 1. Prevent player input
+	# 1. Prevent player input and show overlays
 	is_animating = true
 	loading_spinner.visible = true
 	dimbackground.visible = true
+
+	# --- RESET STATE AND GO WILD ---
+	background_shader_rect.modulate = Color.WHITE # <-- ADD THIS LINE
+	background_shader_rect.material.set_shader_parameter("time_speed", 25.0)
 
 	# 2. Get info from the selected item
 	var original_icon: TextureRect = node.get_node("Icon")
@@ -738,37 +772,32 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	animated_icon.scale = start_scale
 	animated_label.global_position = start_pos + Vector2(0, 120 * start_scale.y)
 
-	# --- Pre-Animation Setup ---
+	# Pre-Animation Setup
 	loading_spinner.modulate.a = 0.0
 	launch_overlay.visible = true
 	
-
 	# 4. Create a SINGLE tween to handle all animations
 	var tween = create_tween().set_parallel()
 	tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
-	# --- Define Animation Targets ---
+	# ... (rest of the animation code is unchanged) ...
 	var screen_size = get_viewport_rect().size
 	var screen_center = screen_size / 2
 	
-	# Animate the icon
 	var icon_target_scale = Vector2.ONE * 3.0
 	tween.tween_property(animated_icon, "global_position", screen_center - (animated_icon.size * icon_target_scale / 2), 0.6)
 	tween.tween_property(animated_icon, "scale", icon_target_scale, 0.6)
 
-	# --- THE NEW FIX: Manually calculate the text's exact dimensions ---
 	var font = animated_label.get_theme_font("font")
 	var font_size = animated_label.get_theme_font_size("font_size")
 	var text_size = font.get_string_size(animated_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 
-	# Calculate the label's target position using the manually calculated width.
 	var label_target_pos = Vector2(
 		screen_center.x - (text_size.x / 2),
 		screen_center.y + 150
 	)
 	tween.tween_property(animated_label, "global_position", label_target_pos, 0.6)
 	
-	# Calculate spinner position based on the label's new target position and calculated height.
 	var spinner_target_pos = Vector2(
 		screen_center.x - (loading_spinner.size.x / 2),
 		label_target_pos.y + text_size.y + 50
@@ -778,9 +807,17 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 
 	# 5. Wait for animations and delay
 	await tween.finished
-	await get_tree().create_timer(4.0).timeout
 	
-	# --- NEW LOGIC ---
+	# --- FREEZE AND DIM THE SHADER (NOW WITH SMOOTHING) ---
+	var dissipate_tween = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	# Animate the shader's speed down to 0 to freeze it
+	dissipate_tween.tween_property(background_shader_rect.material, "shader_parameter/time_speed", 0.0, 1.0)
+	# Animate the modulate color to a dim gray to darken it
+	dissipate_tween.tween_property(background_shader_rect, "modulate", Color(0.3, 0.3, 0.3, 1.0), 1.0)
+	await dissipate_tween.finished
+	
+	await get_tree().create_timer(3.0).timeout 
+	
 	# Remember which game we are about to launch.
 	last_launched_game_coords = current_selection
 	# Update the UI to show the play icon.
@@ -793,7 +830,9 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	if launch_result == OK:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
 
-	# 8. Clean up
+	needs_background_reset = true 
+
+	# 8. Clean up animation overlay
 	launch_overlay.visible = false
 	is_animating = false
 	loading_spinner.visible = false

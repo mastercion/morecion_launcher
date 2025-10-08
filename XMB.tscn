@@ -1,7 +1,8 @@
-[gd_scene load_steps=6 format=3 uid="uid://cg2u6cqq1ttfl"]
+[gd_scene load_steps=7 format=3 uid="uid://cg2u6cqq1ttfl"]
 
 [ext_resource type="Script" uid="uid://ct5y3egbjgjey" path="res://XMB.gd" id="1_4qg5u"]
 [ext_resource type="Shader" uid="uid://bej4ngjqxxgne" path="res://shader/loading_spinner.gdshader" id="2_4ywll"]
+[ext_resource type="AudioStream" uid="uid://o62ftnmqat05" path="res://src/sound/xmb/sound_xmb_move.mp3" id="3_hffq8"]
 
 [sub_resource type="Shader" id="Shader_sea"]
 code = "shader_type canvas_item;
@@ -402,3 +403,6 @@ grow_vertical = 0
 pivot_offset = Vector2(99.41, 49.4)
 
 [node name="ProcessCheckTimer" type="Timer" parent="."]
+
+[node name="NavigationSound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_hffq8")
