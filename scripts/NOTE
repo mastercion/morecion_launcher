@@ -2,3 +2,4 @@ Need to add
 script for python dependencies
 user_selected_python_path_exec" -m pip install python-dotenv
 "user_selected_python_path_exec" -m pip install requests
+"user_selected_python_path_exec" -m pip install pywin32

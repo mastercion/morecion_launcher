@@ -1,17 +1,5 @@
-2025-10-08 18:06:59,289 - INFO - --- Starting Python Scan Script ---
-2025-10-08 18:06:59,289 - INFO - Using directory from command-line argument: C:/Users/Andrej/AppData/Roaming/eden/config
-2025-10-08 18:06:59,289 - INFO - Reading from: C:/Users/Andrej/AppData/Roaming/eden/config\qt-config.ini
-2025-10-08 18:06:59,290 - INFO - Value for gamedir 1: SDMC
-2025-10-08 18:06:59,290 - INFO - Value for gamedir 2: UserNAND
-2025-10-08 18:06:59,290 - INFO - Value for gamedir 3: SysNAND
-2025-10-08 18:06:59,291 - INFO - Value for gamedir 4: E:/
-2025-10-08 18:06:59,291 - INFO -   -> No .nsp or .xci files found in 'E:/'.
-2025-10-08 18:06:59,291 - INFO - Value for gamedir 5: F:/Theo/roms/switch
-2025-10-08 18:06:59,292 - INFO -   -> Searching artwork for 'Mario Kart 8'...
-2025-10-08 18:07:02,744 - INFO -   -> Icon saved to: C:\Users\Andrej\Documents\xmb-emulator\scripts\media\icon\Mario Kart 8 [010075100E8EC000][v0].png
-2025-10-08 18:07:02,748 - INFO -   -> Searching artwork for 'Super Smash Bros'...
-2025-10-08 18:07:06,097 - INFO -   -> Icon saved to: C:\Users\Andrej\Documents\xmb-emulator\scripts\media\icon\Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).png
-2025-10-08 18:07:06,101 - INFO -   -> Storing 2 items from 'F:/Theo/roms/switch'
-2025-10-08 18:07:06,102 - INFO - Saving found directory contents to 'C:/Users/Andrej/Documents/xmb-emulator/scripts/config/gamedir_contents_switch.json'...
-2025-10-08 18:07:06,103 - INFO - Save complete.
-2025-10-08 18:07:06,103 - INFO - --- Python Script Finished ---
+2025-10-10 22:14:29,759 - INFO - --- Focus Script Starting ---
+2025-10-10 22:14:29,759 - INFO - --- Searching for window starting with: 'XMB Emulator' ---
+2025-10-10 22:14:29,761 - INFO - Found matching window: 'XMB Emulator (DEBUG)' (395182)
+2025-10-10 22:14:29,800 - INFO - SUCCESS: Window is now the foreground window.
+2025-10-10 22:14:29,801 - INFO - --- Focus Script Finished ---
