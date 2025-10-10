@@ -4,6 +4,7 @@ var is_combo_pressed: bool = false
 
 func _ready() -> void:
 	print("✅ Controller Hook script is active and listening.")
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 func _process(delta: float) -> void:
 	var a_down: bool = Input.is_joy_button_pressed(0, JOY_BUTTON_X)

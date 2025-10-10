@@ -40,6 +40,8 @@ var last_launched_game_coords = Vector2i(-1, -1)
 var default_shader_time_speed: float = 1.0
 var needs_background_reset = false
 var master_volume_db: float = 0.0
+var is_game_running = false
+var is_window_focused = true
 
 # Node References 
 @onready var camera_origin = $CameraOrigin 
@@ -112,12 +114,15 @@ func _ready():
 	# --- NEW: Setup and start the process checker ---
 	process_check_timer.wait_time = 3.0 # Check every 3 seconds
 	process_check_timer.timeout.connect(_on_process_check_timeout)
+	
+	process_check_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	
 	process_check_timer.start()
 
 func _unhandled_input(event): 
 	var dialogs_visible = background_file_dialog.visible or emulator_dir_dialog.visible or emulator_dir_dialog_exec.visible or $PythonPathDialog.visible
-	if is_animating or dialogs_visible: 
-		return 
+	if is_animating or dialogs_visible or (is_game_running and not is_window_focused):
+		return
 	match current_state: 
 		XMB: handle_xmb_input(event) 
 		SETTINGS: handle_settings_input(event) 
@@ -145,6 +150,7 @@ func _on_process_check_timeout():
 
 	# 5. If the process is NOT running anymore, it means the user closed the game.
 	if not is_running:
+		is_game_running = false
 		# Reset the coordinates to their default "no game launched" state.
 		last_launched_game_coords = Vector2i(-1, -1)
 		# Call the existing update function, which will now hide the icon.
@@ -377,14 +383,24 @@ func handle_accept_action():
 				get_tree().quit()
 		else: # If it's not an action, it must be a submenu
 			show_settings_panel(item_name)
-	else: 
+	else:
+		# --- NEW CHECK ---
+		# If the currently selected game is the one that's already running...
+		if current_selection == last_launched_game_coords:
+			# Manually update our focus state immediately.
+			is_window_focused = false 
+			# ...then minimize the window and skip the launch sequence.
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
+			# PAUSE the main game loop.
+			get_tree().paused = true
+			return
+		# --- END NEW CHECK ---
 		# --- GAME LAUNCH LOGIC ---
 		var selected_node = get_item_node(current_selection)
 		if not selected_node or not selected_node.has_meta("game_path"):
 			print("Error: Could not launch game because path metadata is missing.")
 			return
-		
-		# Instead of launching directly, we now call our animation function.
+		# If it's a different game, call the launch animation function as normal.
 		play_launch_animation_and_run_game(selected_node, category_key)
 
 func handle_settings_accept(): 
@@ -792,21 +808,27 @@ func _execute_game_launch(category_key: String, game_path: String) -> int:
 
 func _notification(what):
 	# This function is called when the game window's state changes.
-	# We check if the window just regained focus.
-	if what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
-		# If it did, and our flag is set, it's time to run the reset animation.
-		if needs_background_reset:
-			# Set the flag to false immediately so this animation doesn't run again.
-			needs_background_reset = false
-			
-			# Create a new tween to animate the background back to its standard state.
-			var reset_tween = create_tween().set_parallel()
-			reset_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-			
-			# Animate the speed from 0 back to the default.
-			reset_tween.tween_property(background_shader_rect.material, "shader_parameter/time_speed", default_shader_time_speed, 1.5)
-			# Animate the color from dim gray back to white.
-			reset_tween.tween_property(background_shader_rect, "modulate", Color.WHITE, 1.5)
+	match what:
+		NOTIFICATION_WM_WINDOW_FOCUS_IN:
+			get_tree().paused = false
+			is_window_focused = true
+			if needs_background_reset:
+				# Set the flag to false immediately so this animation doesn't run again.
+				needs_background_reset = false
+				
+				# Create a new tween to animate the background back to its standard state.
+				var reset_tween = create_tween().set_parallel()
+				reset_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+				
+				# Animate the speed from 0 back to the default.
+				reset_tween.tween_property(background_shader_rect.material, "shader_parameter/time_speed", default_shader_time_speed, 1.5)
+				# Animate the color from dim gray back to white.
+				reset_tween.tween_property(background_shader_rect, "modulate", Color.WHITE, 1.5)
+				
+				update_selection_highlight()
+		
+		NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+			is_window_focused = false # Window is no longer in focus
 
 func play_launch_animation_and_run_game(node: Control, category_key: String):
 	# 1. Prevent player input and show overlays
@@ -894,9 +916,14 @@ func play_launch_animation_and_run_game(node: Control, category_key: String):
 	
 	# 7. Minimize on success
 	if launch_result == OK:
+		is_game_running = true
+		# Manually update our focus state immediately.
+		is_window_focused = false
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
+		# PAUSE the main game loop.
+		get_tree().paused = true
 
-	needs_background_reset = true 
+	needs_background_reset = true
 
 	# 8. Clean up animation overlay
 	launch_overlay.visible = false
