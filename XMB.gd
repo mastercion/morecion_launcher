@@ -12,6 +12,7 @@ const BackgroundItemScene = preload("res://BackgroundItem.tscn")
 const ZOOM_INCREMENT = 0.2 
 const EMULATOR_CONFIG_PATH = "user://emulator_paths.cfg"
 const MENU_DATA_PATH = "res://menu_data.json"
+const APP_CONFIG_PATH = "user://app_settings.cfg"
 
 enum { XMB, SETTINGS } 
 var current_state = XMB 
@@ -38,6 +39,7 @@ var current_emulator_selection = ""
 var last_launched_game_coords = Vector2i(-1, -1)
 var default_shader_time_speed: float = 1.0
 var needs_background_reset = false
+var master_volume_db: float = 0.0
 
 # Node References 
 @onready var camera_origin = $CameraOrigin 
@@ -77,6 +79,7 @@ func _ready():
 	# Load persistent data first
 	load_menu_data() 
 	load_emulator_paths()
+	load_app_settings()
 
 	# Default Shader Behaivor
 	default_shader_time_speed = background_shader_rect.material.get_shader_parameter("time_speed")
@@ -169,7 +172,7 @@ func load_menu_data():
 	var settings_data = {
 		"icon_path": "res://src/icons/settings/icon_settings.svg",
 		"items": {
-			"Display": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_display.svg", "options": ["Menu Speed", "Menu Color", "Background", "Effects"] },
+			"Display": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_display.svg", "options": ["Menu Speed", "Menu Color", "Display Mode", "Background", "Effects"] },
 			"Audio": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_audio.svg", "options": ["Master Volume", "Music Volume", "SFX Volume"] },
 			"Controller Settings": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_controller.svg", "options": ["Vibration", "Button Mapping", "Deadzone"] },
 			"Emulator": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_emulator.svg", "options": ["Switch", "Switch_EXEC", "Wii", "Wii_EXEC", "Playstation 3"] },
@@ -180,7 +183,8 @@ func load_menu_data():
 			"Menu Speed": { "type": "list", "options": ["Slow", "Standard", "Fast"] },
 			"Menu Color": { "type": "list", "options": ["Blue", "Green", "Yellow", "Red"] },
 			"Background": { "type": "submenu", "options": ["Select Background", "Image Fit", "Manual Zoom"] },
-			
+			"Display Mode": { "type": "list", "options": ["Fullscreen", "Borderless Fullscreen"] },
+			"Master Volume": { "type": "list", "options": ["100%", "75%", "50%", "25%", "Mute"] },
 			"Select Background": { "type": "grid" },
 			"Image Fit": { "type": "list", "options": ["Stretch", "Zoom", "Center"] },
 			"Manual Zoom": { "type": "list", "options": ["Zoom In (+)", "Zoom Out (-)"] }
@@ -241,6 +245,37 @@ func save_game_data_to_json(data_to_save):
 		file.store_string(json_string)
 	else:
 		print("Error: Could not write to ", MENU_DATA_PATH)
+
+func save_app_settings():
+	var config = ConfigFile.new()
+	# Audio
+	config.set_value("audio", "master_volume_db", master_volume_db)
+	# Display
+	config.set_value("display", "mode", DisplayServer.window_get_mode())
+	config.set_value("display", "borderless", DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_BORDERLESS))
+	config.save(APP_CONFIG_PATH)
+
+func load_app_settings():
+	var config = ConfigFile.new()
+	var err = config.load(APP_CONFIG_PATH)
+	if err != OK: return
+	
+	# Load Audio Settings
+	master_volume_db = config.get_value("audio", "master_volume_db", 0.0)
+	AudioServer.set_bus_volume_db(0, master_volume_db)
+	
+	# Load Display Settings
+	# Default to fullscreen if no setting is saved
+	var mode = config.get_value("display", "mode", DisplayServer.WINDOW_MODE_FULLSCREEN)
+	var borderless = config.get_value("display", "borderless", false)
+	
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, borderless)
+	DisplayServer.window_set_mode(mode)
+	
+	# Load the value from the file, defaulting to 0.0 (100%) if not found
+	master_volume_db = config.get_value("audio", "master_volume_db", 0.0)
+	# Apply the loaded volume to the master audio bus (bus 0)
+	AudioServer.set_bus_volume_db(0, master_volume_db)
 
 # --- 4. INPUT & NAVIGATION --- 
 
@@ -379,7 +414,33 @@ func handle_settings_accept():
 		show_settings_panel(selected_option_text) 
 	else: 
 		# This part now only handles final choices from a list, like "Slow" or "Fast".
-		match current_menu_title: 
+		match current_menu_title:
+			"Master Volume":
+				match selected_option_text:
+					"100%": master_volume_db = linear_to_db(1.0) # 0.0 dB
+					"75%": master_volume_db = linear_to_db(0.75)
+					"50%": master_volume_db = linear_to_db(0.50)
+					"25%": master_volume_db = linear_to_db(0.25)
+					"Mute": master_volume_db = -80.0 # Effectively silent
+				# Apply the new volume setting
+				AudioServer.set_bus_volume_db(0, master_volume_db)
+				# Save the setting to the file
+				save_app_settings()
+				# Go back to the previous menu
+				go_back_in_settings()
+			"Display Mode":
+				match selected_option_text:
+					"Fullscreen":
+						# Standard exclusive fullscreen
+						DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
+						DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+					"Borderless Fullscreen":
+						# Fullscreen, but in a borderless window
+						DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+						DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+				
+				save_app_settings() # Save the new setting
+				go_back_in_settings()
 			"Menu Speed": 
 				match selected_option_text: 
 					"Slow": ANIM_SPEED = 0.3 
@@ -848,35 +909,41 @@ func create_menu_item(text: String, icon_path: String, is_category: bool) -> Con
 	var icon = TextureRect.new()
 	icon.name = "Icon"
 	
-	# --- START: NEW IMAGE RESIZING LOGIC ---
-	
-	# 1. Load the file into an Image object, which contains the raw pixel data.
+	# --- START: IMAGE RESIZING LOGIC ---
 	var img = Image.new()
-	var err = img.load(icon_path) # Use img.load() as it's safer
+	var err = img.load(icon_path)
 	
-	# 2. Check if the image loaded successfully. If not, load the default icon.
 	if err != OK:
 		print("Warning: Icon not found or could not be loaded: ", icon_path)
-		img.load("res://icon.svg") # Load the default fallback image
+		img.load("res://icon.svg")
 	
-	# 3. Resize the image data in memory to our target size.
-	#    This is the crucial step that scales the image down.
-	img.resize(100, 100) # Force all icons to be 100x100 pixels
-	
-	# 4. Create an ImageTexture from our newly resized Image data.
+	img.resize(100, 100, Image.INTERPOLATE_LANCZOS)
+	img.generate_mipmaps()
 	icon.texture = ImageTexture.create_from_image(img)
-	
-	# --- END: NEW IMAGE RESIZING LOGIC ---
+	# --- END: IMAGE RESIZING LOGIC ---
 	
 	icon.custom_minimum_size = ICON_SIZE
 	icon.size = ICON_SIZE
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	
+	# 1. Use the correct Godot 4 constant for expand_mode
+	icon.expand_mode = TextureRect.EXPAND_KEEP_SIZE 
+	
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	
+	# 2. Move the texture_filter here to apply it to all icons
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR 
+	
 	icon.position = -ICON_SIZE / 2
 	
-	var label = Label.new(); label.name = "Label"; label.text = text; label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER; label.position = Vector2(-200,50) 
-	label.custom_minimum_size = Vector2(400, 50); control.add_child(icon); control.add_child(label) 
+	var label = Label.new()
+	label.name = "Label"
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.position = Vector2(-200,40) 
+	label.custom_minimum_size = Vector2(400, 50)
+	control.add_child(icon)
+	control.add_child(label) 
 	
 	if not is_category:
 		var play_icon = TextureRect.new()
@@ -890,7 +957,8 @@ func create_menu_item(text: String, icon_path: String, is_category: bool) -> Con
 		control.add_child(play_icon)
 	
 	if is_category: 
-		var theme_override = Theme.new(); theme_override.set_font_size("font_size", "Label", 30)
+		var theme_override = Theme.new()
+		theme_override.set_font_size("font_size", "Label", 30)
 		label.theme = theme_override 
 		
 	return control
