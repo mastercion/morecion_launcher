@@ -1,14 +1,27 @@
 {
+	"Playstation 3": {
+		"icon_path": "res://src/icons/platform/icon_ps3.svg",
+		"items": [
+			{
+				"icon_path": "C:/Users/Andrej/Documents/xmb-emulator/scripts/media/icon/Adventure Time_ Explore the Dungeon Because I DON’T KNOW!.png",
+				"id": "BLES01961",
+				"name": "Adventure Time_ Explore the Dungeon Because I DON’T KNOW!",
+				"path": "C:/Users/Andrej/Downloads/ps3-disc-dumper_windows_v4.3.9/Adventure Time_ Explore the Dungeon Because I DON’T KNOW! [BLES01961]/"
+			}
+		]
+	},
 	"Switch": {
 		"icon_path": "res://src/icons/platform/icon_switch.svg",
 		"items": [
 			{
-				"icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Mario Kart 8 [010075100E8EC000][v0].png",
+				"icon_path": "C:/Users/Andrej/Documents/xmb-emulator/scripts/media/icon/Mario Kart 8 [010075100E8EC000][v0].png",
+				"id": "",
 				"name": "Mario Kart 8 [010075100E8EC000][v0].nsp",
 				"path": "F:/Theo/roms/switch/Mario Kart 8 [010075100E8EC000][v0].nsp"
 			},
 			{
-				"icon_path": "C:\\Users\\Andrej\\Documents\\xmb-emulator\\scripts\\media\\icon\\Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).png",
+				"icon_path": "C:/Users/Andrej/Documents/xmb-emulator/scripts/media/icon/Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).png",
+				"id": "",
 				"name": "Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci",
 				"path": "F:/Theo/roms/switch/Super Smash Bros. Ultimate (World) (En,Ja,Fr,De,Es,It,Nl,Zh-Hant,Zh-Hans,Ko,Ru) (Rev 5).xci"
 			}
@@ -18,17 +31,20 @@
 		"icon_path": "res://src/icons/platform/icon_wii.svg",
 		"items": [
 			{
-				"icon_path": null,
+				"icon_path": "C:/Users/Andrej/Documents/xmb-emulator/scripts/media/icon/American Mensa Academy (USA).png",
+				"id": "",
 				"name": "American Mensa Academy (USA).rvz",
 				"path": "C:/Users/Andrej/Downloads/wii-room/American Mensa Academy (USA).rvz"
 			},
 			{
 				"icon_path": null,
+				"id": "",
 				"name": "new.iso",
 				"path": "C:/Users/Andrej/Downloads/wii-room/new.iso"
 			},
 			{
 				"icon_path": null,
+				"id": "",
 				"name": "test.iso",
 				"path": "C:/Users/Andrej/Downloads/wii-room/test.iso"
 			}

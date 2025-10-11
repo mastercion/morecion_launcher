@@ -181,7 +181,7 @@ func load_menu_data():
 			"Display": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_display.svg", "options": ["Menu Speed", "Menu Color", "Display Mode", "Background", "Effects"] },
 			"Audio": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_audio.svg", "options": ["Master Volume", "Music Volume", "SFX Volume"] },
 			"Controller Settings": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_controller.svg", "options": ["Vibration", "Button Mapping", "Deadzone"] },
-			"Emulator": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_emulator.svg", "options": ["Switch", "Switch_EXEC", "Wii", "Wii_EXEC", "Playstation 3"] },
+			"Emulator": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_emulator.svg", "options": ["Switch", "Switch_EXEC", "Wii", "Wii_EXEC", "Playstation 3", "Playstation 3_EXEC"] },
 			"System": { "type": "submenu", "icon_path": "res://src/icons/settings/icon_system.svg", "options": ["Set Python Path"] },
 			"Set Python Path": { "type": "action", "icon_path": "res://src/icons/settings/icon_pythonset.svg" },
 			"Exit": { "type": "action", "icon_path": "res://src/icons/settings/icon_exit.svg" },
@@ -202,7 +202,8 @@ func load_menu_data():
 		print("menu_data.json not found, creating a default one.")
 		game_data = {
 			"Switch": { "icon_path": "res://src/icons/platform/icon_switch.svg", "items": [] },
-			"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] }
+			"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] },
+			"Playstation 3": { "icon_path": "res://src/icons/platform/icon_ps3.svg", "items": [] }
 		}
 		save_game_data_to_json(game_data)
 	else:
@@ -214,7 +215,8 @@ func load_menu_data():
 			print("Warning: menu_data.json is empty. Re-initializing.")
 			game_data = {
 				"Switch": { "icon_path": "res://src/icons/platform/icon_switch.svg", "items": [] },
-				"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] }
+				"Wii": { "icon_path": "res://src/icons/platform/icon_wii.svg", "items": [] },
+				"Playstation 3": { "icon_path": "res://src/icons/platform/icon_ps3.svg", "items": [] }
 			}
 		else:
 			var json = JSON.new()
@@ -612,7 +614,7 @@ func _on_emulator_dir_selected(path: String):
 	show_settings_panel(settings_history.back())
 
 	# IMPORTANT: Only trigger the game scan for game directories, not executables.
-	if current_emulator_selection == "Switch" or current_emulator_selection == "Wii":
+	if current_emulator_selection == "Switch" or current_emulator_selection == "Wii" or current_emulator_selection == "Playstation 3":
 		generate_game_list_for_emulator(current_emulator_selection, path)
 	
 func update_selection_highlight():
@@ -753,6 +755,7 @@ func build_xmb_from_data():
 					item_node = create_menu_item(item_name, icon_path, false)
 					# Store the full path as metadata in the node for later use
 					item_node.set_meta("game_path", item_entry.get("path", ""))
+					item_node.set_meta("game_id", item_entry.get("id", ""))
 				else:
 					# Fallback for old string-based data (shouldn't happen with new script)
 					item_name = str(item_entry)
@@ -770,13 +773,19 @@ func build_xmb_from_data():
 	item_columns_container.position.x = initial_pos_x 
 
 func _execute_game_launch(category_key: String, game_path: String) -> int:
+	# We need the node to get metadata like the game_id for PS3
+	var game_node = get_item_node(current_selection)
+	if not game_node:
+		print("Error: Could not find the selected game node.")
+		return FAILED
+
 	match category_key:
 		"Switch":
 			var python_executable = emulator_paths.get("python_executable_path", "python")
 			var emulator_exec_key = "Switch_EXEC"
 			if not emulator_paths.has(emulator_exec_key):
 				print("Error: Switch emulator executable path is not set in Settings.")
-				return FAILED # Return an error code
+				return FAILED 
 			var emulator_exec_path = emulator_paths[emulator_exec_key]
 			var launcher_script_path = ProjectSettings.globalize_path("res://scripts/launch_game.py")
 
@@ -797,35 +806,56 @@ func _execute_game_launch(category_key: String, game_path: String) -> int:
 				print("Error: Failed to start the command process. Exit code: ", error)
 				print("Output: ", "\n".join(output))
 			
-			return error # Return the result
+			return error
 
 		"Wii":
-			# 1. Define the key for the Wii emulator executable
 			var emulator_exec_key = "Wii_EXEC"
-
-			# 2. Check if the path to Dolphin.exe has been set in the menu
 			if not emulator_paths.has(emulator_exec_key):
 				print("Error: Wii (Dolphin) emulator executable path is not set in Settings.")
-				return FAILED # Return an error code
+				return FAILED
 
-			# 3. Get the executable path from our saved settings
 			var emulator_exec_path = emulator_paths[emulator_exec_key]
-			
-			# 4. Prepare the arguments based on the required command: Dolphin.exe -e "path/to/game"
 			var args = ["-e", game_path]
 			print("--- Godot: Launching Wii Game ---")
 			print("Executing: ", emulator_exec_path, " ", " ".join(args))
 			
-			# 5. Execute the command directly
 			var output = []
 			var error = OS.execute(emulator_exec_path, args, output, true)
 			
-			# 6. Check for errors and print the output if it fails
 			if error != OK:
 				print("Error: Failed to start the Dolphin process. Exit code: ", error)
 				print("Output: ", "\n".join(output))
 
-			# 7. Return the result of the execution
+			return error
+
+		# --- NEW LAUNCH LOGIC FOR PS3 ---
+		"Playstation 3":
+			var emulator_exec_key = "Playstation 3_EXEC"
+			if not emulator_paths.has(emulator_exec_key):
+				print("Error: PS3 (RPCS3) emulator executable path is not set in Settings.")
+				return FAILED
+
+			var game_id = game_node.get_meta("game_id", "")
+			if game_id.is_empty():
+				print("Error: Game ID not found for the selected PS3 game. Cannot launch.")
+				return FAILED
+
+			var emulator_exec_path = emulator_paths[emulator_exec_key]
+			
+			# --- MODIFIED: Format the game ID argument as requested ---
+			var game_id_argument = "%RPCS3_GAMEID%:" + game_id
+			var args = ["--no-gui", game_id_argument]
+			
+			print("--- Godot: Launching Playstation 3 Game ---")
+			print("Executing: ", emulator_exec_path, " ", " ".join(args))
+
+			var output = []
+			var error = OS.execute(emulator_exec_path, args, output, true)
+			
+			if error != OK:
+				print("Error: Failed to start the RPCS3 process. Exit code: ", error)
+				print("Output: ", "\n".join(output))
+
 			return error
 
 		_:
@@ -1063,6 +1093,9 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		"Wii":
 			script_res_path = "res://scripts/read_config_wii.py"
 			output_json_name = "gamedir_contents_wii.json"
+		"Playstation 3": # <-- NEW CASE
+			script_res_path = "res://scripts/read_config_ps3.py"
+			output_json_name = "gamedir_contents_ps3.json"
 		_:
 			print("No Python script configured for ", emulator_name)
 			return
@@ -1074,6 +1107,7 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		return
 
 	var output_json_abs_path = ProjectSettings.globalize_path("res://scripts/config/").path_join(output_json_name)
+	# For PS3, the script needs the directory containing games.yml. For others, it's the game directory.
 	var command_to_run = '"%s" "%s" "%s" "%s"' % [python_executable, script_abs_path, emu_path, output_json_abs_path]
 	var cmd_args = ["/c", command_to_run]
 	
@@ -1104,52 +1138,56 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		return
 		
 	var json_data = json.data
-	var game_items = [] # This will now store dictionaries, not just names
+	var game_items = []
 
 	if typeof(json_data) == TYPE_DICTIONARY:
 		for base_path in json_data.keys():
 			var file_list = json_data[base_path]
 			if typeof(file_list) == TYPE_ARRAY:
 				for game_object in file_list:
-					if typeof(game_object) == TYPE_DICTIONARY and game_object.has("filename"):
-						var filename = game_object["filename"]
-						var icon_path = game_object.get("icon_path", "res://icon.svg")
-						var full_path = base_path.path_join(filename)
+					if typeof(game_object) == TYPE_DICTIONARY:
+						var game_dict = {}
+						# --- START: UPDATED PARSING LOGIC ---
+						# Handle PS3 format from read_config_ps3.py
+						if game_object.has("name") and game_object.has("path"):
+							game_dict = {
+								"name": game_object["name"],
+								"path": game_object["path"],
+								"icon_path": game_object.get("icon_path", "res://icon.svg"),
+								"id": game_object.get("id", "") # Get the game ID
+							}
+						# Handle existing Switch/Wii format
+						elif game_object.has("filename"):
+							var filename = game_object["filename"]
+							game_dict = {
+								"name": filename,
+								"path": base_path.path_join(filename),
+								"icon_path": game_object.get("icon_path", "res://icon.svg"),
+								"id": "" # No ID for these
+							}
+						# --- END: UPDATED PARSING LOGIC ---
 						
-						game_items.append({
-							"name": filename,
-							"path": full_path,
-							"icon_path": icon_path
-						})
+						if not game_dict.is_empty():
+							game_items.append(game_dict)
 	else:
 		print("Error: The JSON from the Python script is not a dictionary as expected.")
 		return
 
 	print("Found %d games for %s from script output." % [game_items.size(), emulator_name])
 	
-	# --- CORRECTED LOGIC ---
-	
-	# 1. Determine the correct icon path first
-	var category_icon_path = "res://icon.svg"
-	if emulator_name == "Switch":
-		category_icon_path = "res://src/icons/platform/icon_switch.svg"
-	elif emulator_name == "Wii":
-		category_icon_path = "res://src/icons/platform/icon_wii.svg"
-	
-	# 2. Update the in-memory MENU_DATA directly for the current session
+	# --- THIS LOGIC REMAINS THE SAME ---
+	var category_icon_path = MENU_DATA.get(emulator_name, {}).get("icon_path", "res://icon.svg")
+
 	if not MENU_DATA.has(emulator_name):
 		MENU_DATA[emulator_name] = {}
 		
 	MENU_DATA[emulator_name]["icon_path"] = category_icon_path
 	MENU_DATA[emulator_name]["items"] = game_items
 	
-	# 3. Create a clean version of the data to save to the file
-	#    (This removes the "Settings" category from the JSON file)
 	var data_to_save = MENU_DATA.duplicate()
 	data_to_save.erase("Settings")
 	save_game_data_to_json(data_to_save)
 	
-	# 4. Now, rebuild the menu using the updated in-memory data
 	rebuild_xmb_menu()
 	
 	# The redundant block that was causing the issue has been removed.
@@ -1170,6 +1208,8 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		icon = "res://src/icons/platform/icon_switch.svg"
 	elif emulator_name == "Wii":
 		icon = "res://src/icons/platform/icon_wii.svg"
+	elif emulator_name == "Playstation 3":
+		icon = "res://src/icons/platform/icon_ps3.svg"
 		
 	game_data[emulator_name] = {
 		"icon_path": icon,
