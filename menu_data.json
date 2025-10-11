@@ -18,14 +18,17 @@
 		"icon_path": "res://src/icons/platform/icon_wii.svg",
 		"items": [
 			{
+				"icon_path": null,
 				"name": "American Mensa Academy (USA).rvz",
 				"path": "C:/Users/Andrej/Downloads/wii-room/American Mensa Academy (USA).rvz"
 			},
 			{
+				"icon_path": null,
 				"name": "new.iso",
 				"path": "C:/Users/Andrej/Downloads/wii-room/new.iso"
 			},
 			{
+				"icon_path": null,
 				"name": "test.iso",
 				"path": "C:/Users/Andrej/Downloads/wii-room/test.iso"
 			}

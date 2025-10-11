@@ -743,9 +743,12 @@ func build_xmb_from_data():
 				# For games, the entry is a dictionary { "name": ..., "path": ..., "icon_path": ... }
 				if typeof(item_entry) == TYPE_DICTIONARY:
 					item_name = item_entry.get("name", "Unknown Game")
-					# --- MODIFIED LINE ---
-					# Use the icon_path from the dictionary, with a fallback
-					icon_path = item_entry.get("icon_path", "res://icon.svg") 
+					
+					# Get the icon path, which might be null
+					icon_path = item_entry.get("icon_path") 
+					# If it's null or missing, set a default
+					if not icon_path:
+						icon_path = "res://icon.svg"
 					
 					item_node = create_menu_item(item_name, icon_path, false)
 					# Store the full path as metadata in the node for later use
@@ -797,8 +800,33 @@ func _execute_game_launch(category_key: String, game_path: String) -> int:
 			return error # Return the result
 
 		"Wii":
-			print("Wii launch logic is not yet implemented.")
-			return FAILED
+			# 1. Define the key for the Wii emulator executable
+			var emulator_exec_key = "Wii_EXEC"
+
+			# 2. Check if the path to Dolphin.exe has been set in the menu
+			if not emulator_paths.has(emulator_exec_key):
+				print("Error: Wii (Dolphin) emulator executable path is not set in Settings.")
+				return FAILED # Return an error code
+
+			# 3. Get the executable path from our saved settings
+			var emulator_exec_path = emulator_paths[emulator_exec_key]
+			
+			# 4. Prepare the arguments based on the required command: Dolphin.exe -e "path/to/game"
+			var args = ["-e", game_path]
+			print("--- Godot: Launching Wii Game ---")
+			print("Executing: ", emulator_exec_path, " ", " ".join(args))
+			
+			# 5. Execute the command directly
+			var output = []
+			var error = OS.execute(emulator_exec_path, args, output, true)
+			
+			# 6. Check for errors and print the output if it fails
+			if error != OK:
+				print("Error: Failed to start the Dolphin process. Exit code: ", error)
+				print("Output: ", "\n".join(output))
+
+			# 7. Return the result of the execution
+			return error
 
 		_:
 			print("Cannot launch. No launch logic for category '%s'." % [category_key])
@@ -1059,8 +1087,6 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		return
 	
 	print("Python script executed successfully.")
-
-	#var output_json_abs_path = ProjectSettings.globalize_path("res://scripts/config/").path_join(output_json_name)
 	
 	if not FileAccess.file_exists(output_json_abs_path):
 		print("Error: Python script finished, but the output JSON was not found at %s" % output_json_abs_path)
@@ -1070,8 +1096,6 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 	var content = file.get_as_text()
 	file.close()
 	
-	# DirAccess.remove_absolute(output_json_abs_path)
-	
 	var json = JSON.new()
 	var error = json.parse(content)
 	
@@ -1079,39 +1103,34 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 		print("Error: Could not parse the JSON file created by the Python script.")
 		return
 		
-	# --- NEW FIX: Handle the dictionary structure from Python ---
 	var json_data = json.data
 	var game_items = [] # This will now store dictionaries, not just names
 
 	if typeof(json_data) == TYPE_DICTIONARY:
-		# Iterate through the keys (the base paths) of the dictionary
 		for base_path in json_data.keys():
 			var file_list = json_data[base_path]
 			if typeof(file_list) == TYPE_ARRAY:
-				# For each game object (which is a dictionary) in the list...
 				for game_object in file_list:
-					# Check if it's actually a dictionary with the keys we need
 					if typeof(game_object) == TYPE_DICTIONARY and game_object.has("filename"):
 						var filename = game_object["filename"]
-						var icon_path = game_object.get("icon_path", "res://icon.svg") # Use a default if no icon
+						var icon_path = game_object.get("icon_path", "res://icon.svg")
 						var full_path = base_path.path_join(filename)
 						
 						game_items.append({
 							"name": filename,
 							"path": full_path,
-							"icon_path": icon_path # <-- Store the icon path
+							"icon_path": icon_path
 						})
 	else:
 		print("Error: The JSON from the Python script is not a dictionary as expected.")
 		return
-	# --- END NEW LOGIC ---
 
 	print("Found %d games for %s from script output." % [game_items.size(), emulator_name])
 	
-	# --- START: NEW AND CORRECTED LOGIC ---
+	# --- CORRECTED LOGIC ---
 	
 	# 1. Determine the correct icon path first
-	var category_icon_path = "res://icon.svg" # Default fallback
+	var category_icon_path = "res://icon.svg"
 	if emulator_name == "Switch":
 		category_icon_path = "res://src/icons/platform/icon_switch.svg"
 	elif emulator_name == "Wii":
@@ -1132,6 +1151,8 @@ func generate_game_list_for_emulator(emulator_name: String, emu_path: String):
 	
 	# 4. Now, rebuild the menu using the updated in-memory data
 	rebuild_xmb_menu()
+	
+	# The redundant block that was causing the issue has been removed.
 	
 	# --- END: NEW AND CORRECTED LOGIC ---
 	

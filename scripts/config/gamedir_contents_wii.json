@@ -1,7 +1,16 @@
 {
     "C:/Users/Andrej/Downloads/wii-room": [
-        "American Mensa Academy (USA).rvz",
-        "new.iso",
-        "test.iso"
+        {
+            "filename": "American Mensa Academy (USA).rvz",
+            "icon_path": null
+        },
+        {
+            "filename": "new.iso",
+            "icon_path": null
+        },
+        {
+            "filename": "test.iso",
+            "icon_path": null
+        }
     ]
 }

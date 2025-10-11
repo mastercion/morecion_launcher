@@ -1,2 +1,5 @@
 scripts/.env
 .godot/
+scripts/python_scanner.log
+scripts/scripts/config/gamedir_contents_wii.json
+scripts/scripts/config/gamedir_contents_switch.json

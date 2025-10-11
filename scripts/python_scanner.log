@@ -1,5 +1,5 @@
-2025-10-10 23:00:38,522 - INFO - --- Focus Script Starting ---
-2025-10-10 23:00:38,522 - INFO - --- Searching for window starting with: 'XMB Emulator' ---
-2025-10-10 23:00:38,523 - INFO - Found matching window: 'XMB Emulator (DEBUG)' (2164660)
-2025-10-10 23:00:38,565 - INFO - SUCCESS: Window is now the foreground window.
-2025-10-10 23:00:38,566 - INFO - --- Focus Script Finished ---
+2025-10-11 15:31:24,443 - INFO - --- Focus Script Starting ---
+2025-10-11 15:31:24,444 - INFO - --- Searching for window starting with: 'XMB Emulator' ---
+2025-10-11 15:31:24,445 - INFO - Found matching window: 'XMB Emulator (DEBUG)' (1050910)
+2025-10-11 15:31:24,450 - WARNING - FAILURE: OS prevented the window from taking focus.
+2025-10-11 15:31:24,450 - INFO - --- Focus Script Finished ---
